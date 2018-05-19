@@ -1,0 +1,145 @@
+# Individual Project -First Version _ Deceptive Data Product
+## Gun Violence - a unique US problem
+#### Yan Cao
+
+
+## 3. Gun control
+```{r}
+setwd("/Users/yancao/Desktop/SCU/Spring 2018/Visualization/Individual Project")
+# load dataset:
+# raw_data source: https://www.kaggle.com/jonathanbouchet/firearm-regulations-in-the-u-s/notebook
+raw_data<-read.csv('https://raw.githubusercontent.com/allisonyanc/IP_viz/IP_FV_Deceptive/gun_regulation_raw_data.csv',sep=',',stringsAsFactors=F)
+```
+
+```{r}
+# load useful packages
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+library(ggthemes)
+library(RColorBrewer)
+library(viridis)
+library(openxlsx)
+library(choroplethr)
+library(ggridges)
+library(knitr)
+library(ggrepel)
+library(fmsb)
+```
+
+```{r}
+codes <- read.xlsx("codebook.xlsx")
+```
+
+**- Deception:** The original plot has too many information on it, which it is hard to read it. Since I want to 
+focus on differences before and after "Sandy Hook" mass shooting and there's not much differences 1991-2017 (which then in this case is different than the "number of mass shooting"" plot), I cut the data to only years 2007 - 2017 (5 years ahead and 5 years after, 10 years in total).
+```{r}
+raw_data1 = raw_data[ which(raw_data$year >= '2007'),]
+
+raw_data1 %>% dplyr::select(state,year,lawtotal) %>% 
+  mutate(state = factor(state),
+         state = factor(state, levels = rev(levels(state))),
+         perc = 100*(lawtotal/133)) %>% 
+  ggplot(aes(x=perc,y=factor(year), fill = ..x..)) + 
+  geom_density_ridges_gradient(scale = 3,gradient_lwd = 1.,alpha=.1) +
+  scale_fill_viridis(option="plasma", name='percentage',limits=c(0,100)) + 
+  theme_fivethirtyeight() + 
+  labs(x = 'year', y = '% of acceptance', title = 'US historical firearms regulations acceptance by years') +
+  theme(legend.position='right', legend.direction='vertical',axis.title.y = element_blank(),
+        axis.title.x = element_blank()) + xlim(0,100) 
+```
+![](images/regulation1.png)
+
+This chart shows the percentage normalized to the total number of regulations in effect within
+the US. From the chart it shows the US firearms regulations is still not effective comparing to the
+historical records. For example, in 2017, there are only less than 15% of all states in the US are
+above 50% acceptance.
+
+
+
+```{r}
+#make provisions vector for each category
+listCodes<-list()
+for(i in 1:length(unique(codes$Category.Code))){
+    listCodes[[i]]<-codes %>% dplyr::filter(Category.Code==i) %>% dplyr::select(Variable.Name) %>% sapply(as.character) %>% as.vector()
+}
+```
+
+```{r}
+namesCat<-c('dealer_regulation','buyer_regulation','prohibition_high_risk','background_check','ammo_regulation','possession_regulation','concealed_carry','assault_weapon_mag','child_access_prev','gun_trafficking','stand_your_ground','preemption','immunity','domestic_violence')
+
+tempo<-list()
+baseDf<-raw_data1[ ,c('year','state')]
+for(i in 1:length(namesCat)){
+    temp<-data.frame(raw_data1[ ,c(listCodes[[i]])])
+    totCols<-length(colnames(temp))
+    tempDf<-temp %>% dplyr::mutate(sum = rowSums(.), perc = round(100*(sum/totCols),2)) %>% dplyr::select(sum,perc)
+    tempDf$Cat<-rep(namesCat[i],1,nrow(tempDf))
+    tempo[[i]]<-cbind(baseDf,tempDf)
+}
+#make a dataframe from all lists
+RES <- do.call("rbind", tempo)
+```
+
+National level Historical Firearms Regulations acceptance per category
+```{r}
+RES %>% 
+  dplyr::group_by(Cat,year) %>% 
+  dplyr::summarize(meanCat = mean(perc)) %>%
+  ggplot(aes(x=factor(year),y=meanCat,group=Cat)) +
+  geom_line(aes(color=meanCat),size=1.5) +
+  scale_color_gradientn(name="",colors=rev(viridis::viridis(10)),limits=c(0,100)) +
+  theme_fivethirtyeight() + 
+  theme(axis.text.x = element_text(size=6,angle=45),
+        axis.text.y = element_text(size=6)) +
+  ylim(0,100) + facet_wrap(~Cat,ncol=2) + 
+  labs(title="Historical Firearms Regulations acceptance per category")
+```
+![](images/regulation2.png)
+
+**- Deception:** I changed the year to 2007-2017 in this plot again, and also changed the originally picked state "Florida" to "Sandy Hook" event location "Connecticut" so that I can match this to the previous mass shooting analysis and see if any patterns. And the new result shows much larger movements than the first version one.
+```{r}
+plotCategory<-function(x){
+  RES %>% 
+  dplyr::filter(state==curState) %>% 
+  ggplot(aes(x=factor(year),y=perc,group=Cat)) + 
+  geom_line(aes(color=perc),size=1.5) + 
+  theme_fivethirtyeight() +
+  theme(axis.text.x = element_text(size=6,angle=45),
+        axis.text.y = element_text(size=6)) + 
+  scale_color_gradientn(name="percentage ",colors=rev(viridis::viridis(100)),limits=c(0,100)) +
+  ylim(0,100) + facet_wrap(~Cat,ncol=2) + 
+  ggtitle(paste0('Historical Firearms regulations acceptance per category in ',curState),
+          subtitle = 'percentage normalized to the total number of regulations in each category')
+}
+
+curState<-'Connecticut'  # sandy hooks happened in connecticut
+plotCategory(curState)
+```
+![](images/regulation3.png)
+
+To investigate more into different categories of firearm regulations, we can tell after Sandy Hook, there're many regulations having increasing acceptance rates in Connecticut since 2012.
+
+
+
+
+## Conclusion:
+As a conclusion, gun violence in the US is still a severe problem that need the whole society’s
+attentions. Although the firearm homicide might not be directly driven by gun ownership, the
+horrible fact of almost one gun per capita in the US should also drive the government’s attention.
+Social media regulations on how to broadcasting the tragedy to the public to increase the
+awareness, but at the same time preventing spreading the “satisfaction” of mass shooting to the
+criminals could be another project that the society needs to keep working on. Then the most
+importantly, which at the same time is also the most difficult part, gun control. From the charts
+we can tell the firearm regulations acceptance rates is not changing much comparing to the
+increasing mass shooting and firearm homicide rate throughout the years. Although it is true that
+the citizens have right to keep them safe on a personal level, which makes gun control less
+practical, it is then even more important to implement gun knowledge and implement regulations
+on gun sales to prevent tragedies happening from the source.
+
+
+## Future Data Product Improvements:
+Other than those problems mentioned in "deception" sections, I will also work on combining the R file with the Notebook file into one complete report and also come up with more analysis based on the plot results and real world issues.
+
+
+
