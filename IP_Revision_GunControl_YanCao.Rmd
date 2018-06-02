@@ -1,0 +1,134 @@
+---
+title: "IP_Revision_Regulations_YanCao"
+author: "Allison Yan Cao"
+date: "6/1/2018"
+output: html_document
+---
+
+## 3. Firearms Regulations Acceptance
+```{r}
+# load useful packages:
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+library(ggthemes)
+library(RColorBrewer)
+library(viridis)
+library(openxlsx)
+library(choroplethr)
+library(ggridges)
+library(knitr)
+library(ggrepel)
+library(fmsb)
+```
+
+### Data Wrangling:
+```{r}
+# load dataset:
+setwd("/Users/yancao/Desktop/SCU/Spring 2018/Visualization/Individual Project/IP_FV_redesign")
+raw_data<-read.csv('https://raw.githubusercontent.com/allisonyanc/IP_viz/IP_FV_Deceptive/gun_regulation_raw_data.csv',sep=',',stringsAsFactors=F)
+codes <- read.xlsx("codebook.xlsx")
+```
+
+```{r}
+#make provisions vector for each category:
+listCodes<-list()
+for(i in 1:length(unique(codes$Category.Code))){
+    listCodes[[i]]<-codes %>% dplyr::filter(Category.Code==i) %>% dplyr::select(Variable.Name) %>% sapply(as.character) %>% as.vector()
+}
+```
+
+```{r}
+#subset the dataset for each component and sum components of each categories:
+namesCat<-c('dealer_regulation','buyer_regulation','prohibition_high_risk','background_check','ammo_regulation','possession_regulation','concealed_carry','assault_weapon_mag','child_access_prev','gun_trafficking','stand_your_ground','preemption','immunity','domestic_violence')
+
+tempo<-list()
+baseDf<-raw_data[ ,c('year','state')]
+for(i in 1:length(namesCat)){
+    temp<-data.frame(raw_data[ ,c(listCodes[[i]])])
+    totCols<-length(colnames(temp))
+    tempDf<-temp %>% dplyr::mutate(sum = rowSums(.), perc = round(100*(sum/totCols),2)) %>% dplyr::select(sum,perc)
+    tempDf$Cat<-rep(namesCat[i],1,nrow(tempDf))
+    tempo[[i]]<-cbind(baseDf,tempDf)
+}
+
+#make a dataframe from all lists:
+RES <- do.call("rbind", tempo)
+```
+
+### Redesign:
+```{r}
+# plot US historical firearms regulations acceptance rate by years:
+raw_data %>% dplyr::select(state,year,lawtotal) %>% 
+  mutate(state = factor(state),
+         state = factor(state, levels = rev(levels(state))),
+         perc = 100*(lawtotal/133)) %>% 
+  ggplot(aes(x=perc,y=factor(year), fill = ..x..)) + 
+  geom_density_ridges_gradient(scale = 3,gradient_lwd = 1.,alpha=.1) +
+  scale_fill_viridis(option="plasma", name='percentage',limits=c(0,100)) + 
+  theme_fivethirtyeight() + 
+  labs(x = 'year', y = '% of acceptance', title = 'US historical firearms regulations acceptance by years') +
+  theme(legend.position='right', legend.direction='vertical',axis.title.y = element_blank(),
+        axis.title.x = element_blank()) + xlim(0,100) 
+```
+
+```{r}
+# plot historical firearms regulations acceptance per category by years:
+RES %>% 
+  dplyr::group_by(Cat,year) %>% 
+  dplyr::summarize(meanCat = mean(perc)) %>%
+  ggplot(aes(x=factor(year),y=meanCat,group=Cat)) +
+  geom_line(aes(color=meanCat),size=1.5) +
+  scale_color_gradientn(name="",colors=rev(viridis::viridis(10)),limits=c(0,100)) +
+  theme_fivethirtyeight() + 
+  theme(axis.text.x = element_text(size=6,angle=45),
+        axis.text.y = element_text(size=6)) +
+  ylim(0,100) + facet_wrap(~Cat,ncol=2) + 
+  labs(title="firearms regulations acceptance per category by years")
+```
+
+### Deceptive Version
+```{r}
+# plot the deceptive version of the historical firearms regulations acceptance per category by years chart:
+raw_data1 = raw_data[ which(raw_data$year >= '2007'),]
+
+namesCat<-c('dealer_regulation','buyer_regulation','prohibition_high_risk','background_check','ammo_regulation','possession_regulation','concealed_carry','assault_weapon_mag','child_access_prev','gun_trafficking','stand_your_ground','preemption','immunity','domestic_violence')
+
+tempo<-list()
+baseDf<-raw_data1[ ,c('year','state')]
+for(i in 1:length(namesCat)){
+    temp<-data.frame(raw_data1[ ,c(listCodes[[i]])])
+    totCols<-length(colnames(temp))
+    tempDf<-temp %>% dplyr::mutate(sum = rowSums(.), perc = round(100*(sum/totCols),2)) %>% dplyr::select(sum,perc)
+    tempDf$Cat<-rep(namesCat[i],1,nrow(tempDf))
+    tempo[[i]]<-cbind(baseDf,tempDf)
+}
+#make a dataframe from all lists
+RES <- do.call("rbind", tempo)
+
+
+plotCategory<-function(x){
+  RES %>% 
+  dplyr::filter(state==curState) %>% 
+  ggplot(aes(x=factor(year),y=perc,group=Cat)) + 
+  geom_line(aes(color=perc),size=1.5) + 
+  theme_fivethirtyeight() +
+  theme(axis.text.x = element_text(size=6,angle=45),
+        axis.text.y = element_text(size=6)) + 
+  scale_color_gradientn(name="percentage ",colors=rev(viridis::viridis(100)),limits=c(0,100)) +
+  ylim(0,100) + facet_wrap(~Cat,ncol=2) + 
+  ggtitle(paste0('Historical Firearms regulations acceptance per category in ',curState),
+          subtitle = 'percentage normalized to the total number of regulations in each category')
+}
+
+curState<-'Connecticut'  # sandy hooks happened in connecticut
+plotCategory(curState)
+```
+
+
+
+
+
+
+
+
