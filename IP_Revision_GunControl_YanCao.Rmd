@@ -71,7 +71,7 @@ raw_data %>% dplyr::select(state,year,lawtotal) %>%
   theme(legend.position='right', legend.direction='vertical',axis.title.y = element_blank(),
         axis.title.x = element_blank()) + xlim(0,100) 
 ```
-
+![](national_1.png)
 ```{r}
 # plot historical firearms regulations acceptance per category by years:
 RES %>% 
@@ -86,7 +86,7 @@ RES %>%
   ylim(0,100) + facet_wrap(~Cat,ncol=2) + 
   labs(title="firearms regulations acceptance per category by years")
 ```
-
+![](category_1.png)
 ### Deceptive Version
 ```{r}
 # plot the deceptive version of the historical firearms regulations acceptance per category by years chart:
@@ -124,7 +124,7 @@ plotCategory<-function(x){
 curState<-'Connecticut'  # sandy hooks happened in connecticut
 plotCategory(curState)
 ```
-
+![](connecticut.png)
 
 
 
